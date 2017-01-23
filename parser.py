@@ -1,7 +1,7 @@
 from lexer import Lexer, Token, TokenType
 from typing import List
 from io import TextIOBase
-
+import codegen
 
 class Expr:
     pass
@@ -64,12 +64,20 @@ class Prototype:
 class Function:
     """Function statement. e.g e.g. def f(n) n + 1"""
 
+    anon_counter = 0
+
     def __init__(self, proto: Prototype, body: Expr):
         self.proto = proto
         self.body = body
 
     def __repr__(self):
         return f"Function(proto={repr(self.proto)}, body={repr(self.body)})"
+
+    @classmethod
+    def create_anonymous(cls, body):
+        proto = Prototype(f"_anon{cls.anon_counter}", [])
+        cls.anon_counter += 1
+        return cls(proto, body)
 
 
 class ParseError(Exception):
@@ -214,6 +222,11 @@ class Parser:
         args = []
         while self.next_token().type == TokenType.IDENTIFIER:
             args.append(self.cur_tok.value)
+            self.next_token()
+            if self.cur_tok.value == ")":
+                break
+            if self.cur_tok.value != ",":
+                raise ParseError(f", expected, got {self.cur_tok}")
         if self.cur_tok.type != TokenType.OP or self.cur_tok.value != ')':
             raise ParseError(f"Expexted ) got {self.cur_tok.value}")
         self.next_token()  # eat )
@@ -226,6 +239,9 @@ class Parser:
         """
         self.next_token()  # eat def
         proto = self._parse_prototype()
+        if self.cur_tok.value != ':':
+            raise ParseError("Exprected : before function body")
+        self.next_token()  # eat :
         body = self._parse_expr()
         return Function(proto, body)
 
@@ -242,16 +258,16 @@ class Parser:
 
         toplevel ::= expression
         """
-        expr = self._parse_expr()
-        return Function(Prototype("", []), expr)
+        return Function.create_anonymous(self._parse_expr())
 
     def parse(self):
         print("ready> ", end=None)
         self.next_token()
+        generator = codegen.IRGenerator()
         while True:
             print("ready> ", end=None)
             if self.cur_tok.type == TokenType.EOF:
-                return
+                break
             elif self.cur_tok.type == TokenType.DEF:
                 node = self._parse_definition()
             elif self.cur_tok.type == TokenType.EXTERN:
@@ -262,12 +278,5 @@ class Parser:
             else:
                 node = self._parse_top_level_expr()
             print(repr(node))
-
-
-def main():
-    import sys
-    parser = Parser(sys.stdin)
-    parser.parse()
-
-if __name__ == "__main__":
-    main()
+            print(generator.generate(node))
+        print(generator.module)

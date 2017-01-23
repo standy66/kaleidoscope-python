@@ -15,18 +15,20 @@ class TokenType(Enum):
 
 
 class Token:
+    GENERIC_TOKEN_TYPES = [TokenType.NUMBER, TokenType.IDENTIFIER, TokenType.OP]
+
     def __init__(self, token_type: TokenType, **kwargs):
         self.type = token_type
-        if self.type in [TokenType.NUMBER, TokenType.IDENTIFIER, TokenType.OP]:
+        if self.type in Token.GENERIC_TOKEN_TYPES:
             self.value = kwargs["value"]
         else:
-            self.value = None
+            self.value = self.type.name
 
     def __str__(self):
         return repr(self)
 
     def __repr__(self):
-        if self.value is None:
+        if self.type not in Token.GENERIC_TOKEN_TYPES:
             return f"Token(token_type={self.type})"
         else:
             return f"Token(token_type={self.type}, value={repr(self.value)})"
